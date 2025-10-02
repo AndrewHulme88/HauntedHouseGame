@@ -4,18 +4,29 @@ public class GhostHealth : MonoBehaviour
 {
     [SerializeField] private int maxHealth = 3;
     private int hp;
+    private EnemySuck enemySuck;
 
-    private void Awake() { hp = maxHealth; }
+    private void Awake() 
+    { 
+        hp = maxHealth;
+        enemySuck = GetComponent<EnemySuck>();
+    }
 
     public void ApplyTorchDamage(int amount)
     {
         hp -= amount;
-        if (hp <= 0) Die();
+        if (hp <= 0) Stun();
     }
 
-    private void Die()
+    private void Stun()
     {
-        // Replace with your ghost “capturable/stunned” state later
-        Destroy(gameObject);
+        if (enemySuck != null)
+        {
+            enemySuck.SetCapturable(true);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }
