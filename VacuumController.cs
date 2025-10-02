@@ -4,48 +4,68 @@ using UnityEngine.InputSystem;
 public class VacuumController : MonoBehaviour
 {
     [Header("Input (assign in Inspector)")]
-    [SerializeField] private InputActionReference vacuumAction; // Button (hold)
+    [SerializeField] private InputActionReference vacuumAction; 
 
     [Header("Geometry")]
-    [SerializeField] private Transform suctionOrigin;           // where the beam starts (e.g., hand)
+    [SerializeField] private Transform suctionOrigin;
     [SerializeField] private float maxRange = 5f;
     [SerializeField, Range(1f, 120f)] private float coneAngleDeg = 40f;
 
     [Header("Effects")]
-    [SerializeField] private float pullForce = 25f;             // physics pull toward origin
+    [SerializeField] private float pullForce = 25f;            
     [SerializeField] private float captureDps = 1.2f;           // progress per second while in cone
     [SerializeField] private LayerMask ghostMask;
     [SerializeField] private LayerMask obstacleMask;            // walls/geometry blocking LOS
-    [SerializeField] private GameObject beamVFX;                // optional: a line/quad sprite
+    [SerializeField] private GameObject beamVFX;                
 
-    private PlayerController player;
-    private Rigidbody2D rb; // optional, if you need player data
+    private PlayerController playerController;
     private Vector3 beamBaseScale;
 
     private void Awake()
     {
-        if (!suctionOrigin) suctionOrigin = transform;
-        player = GetComponent<PlayerController>();
-        rb = GetComponent<Rigidbody2D>();
-        if (beamVFX) beamBaseScale = beamVFX.transform.localScale;
+        playerController = GetComponent<PlayerController>();
+
+        if (!suctionOrigin)
+        {
+            suctionOrigin = transform;
+        }
+
+        if (beamVFX)
+        {
+            beamBaseScale = beamVFX.transform.localScale;
+        }
     }
 
-    private void OnEnable() { vacuumAction.action.Enable(); }
-    private void OnDisable() { vacuumAction.action.Disable(); }
+    private void OnEnable() 
+    { 
+        vacuumAction.action.Enable(); 
+    }
+
+    private void OnDisable() 
+    { 
+        vacuumAction.action.Disable(); 
+    }
 
     private void Update()
     {
         bool active = vacuumAction.action.IsPressed();
-        if (beamVFX) beamVFX.SetActive(active);
 
-        if (active && beamVFX) UpdateBeamPose(maxRange); // visual to max, trimmed per-target below
+        if (beamVFX)
+        {
+            beamVFX.SetActive(active);
+        }
+
+        if (active && beamVFX)
+        {
+            UpdateBeamPose(maxRange);
+        }
     }
 
     private void FixedUpdate()
     {
         if (!vacuumAction.action.IsPressed()) return;
 
-        Vector2 aim = player ? player.GetAimDir() : Vector2.right;
+        Vector2 aim = playerController ? playerController.GetAimDir() : Vector2.right;
         Vector2 origin = suctionOrigin.position;
 
         // Broadphase: circle overlap
@@ -81,7 +101,6 @@ public class VacuumController : MonoBehaviour
                 col.attachedRigidbody.AddForce(dir * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
             }
 
-            // Apply capture progress
             ghost.ApplyVacuumProgress(captureDps * Time.fixedDeltaTime);
 
             // Track closest for beam shortening
@@ -97,11 +116,10 @@ public class VacuumController : MonoBehaviour
             UpdateBeamPose(bestDist, bestPoint);
     }
 
-    // --- Beam pose helpers (simple quad/sprite stretched from origin toward aim) ---
     private void UpdateBeamPose(float length, Vector2? toPoint = null)
     {
         Vector2 origin = suctionOrigin.position;
-        Vector2 aim = player ? player.GetAimDir() : Vector2.right;
+        Vector2 aim = playerController ? playerController.GetAimDir() : Vector2.right;
 
         Vector2 end = toPoint.HasValue ? toPoint.Value : origin + aim.normalized * length;
         Vector2 mid = (origin + end) * 0.5f;
@@ -119,7 +137,7 @@ public class VacuumController : MonoBehaviour
     {
         if (!suctionOrigin) return;
         var origin = (Vector2)suctionOrigin.position;
-        Vector2 aim = Application.isPlaying && player ? player.GetAimDir()
+        Vector2 aim = Application.isPlaying && playerController ? playerController.GetAimDir()
                                                       : new Vector2(transform.localScale.x >= 0f ? 1f : -1f, 0f);
 
         // Draw cone
