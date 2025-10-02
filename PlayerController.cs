@@ -50,7 +50,7 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        // Simple grounded check + jump
+        // Ground check + jump
         bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundRadius, groundMask);
         if (grounded && jumpAction.action.WasPressedThisFrame())
         {
