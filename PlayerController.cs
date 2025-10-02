@@ -58,6 +58,19 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    public Vector2 GetAimDir()
+    {
+        Vector2 forward = new Vector2(transform.localScale.x >= 0f ? 1f : -1f, 0f);
+        if (moveAction == null) return forward;
+
+        Vector2 aim = moveAction.action.ReadValue<Vector2>();
+        if (aim.sqrMagnitude < 0.01f) return forward;
+
+        // Snap up if Y dominates and is positive
+        if (Mathf.Abs(aim.y) > Mathf.Abs(aim.x) && aim.y > 0f) return Vector2.up;
+        return forward;
+    }
+
     private void OnDrawGizmosSelected()
     {
         if (!groundCheck) return;
