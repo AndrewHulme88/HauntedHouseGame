@@ -5,11 +5,14 @@ public class PlayerController : MonoBehaviour
 {
     [Header("Input (assign in Inspector)")]
     [SerializeField] private InputActionReference moveAction;   
-    [SerializeField] private InputActionReference jumpAction;   
+    [SerializeField] private InputActionReference jumpAction;
+    [SerializeField] private InputActionReference aimAction;
 
     [Header("Tuning")]
     [SerializeField] private float moveSpeed = 8f;
     [SerializeField] private float jumpForce = 12f;
+    [SerializeField, Range(0f, 1f)] private float aimUpEnter = 0.6f;
+    [SerializeField, Range(0f, 1f)] private float aimUpExit = 0.4f;
 
     [Header("Ground Check")]
     [SerializeField] private Transform groundCheck;  
@@ -19,6 +22,8 @@ public class PlayerController : MonoBehaviour
     private Rigidbody2D rb;
     private Animator anim;
     private bool isFacingRight = true;
+    private Vector2 move;
+    private bool isAimingUp = false;
 
     private void Awake()
     {
@@ -28,17 +33,21 @@ public class PlayerController : MonoBehaviour
 
     private void OnEnable()
     { 
-        moveAction.action.Enable(); jumpAction.action.Enable(); 
+        moveAction.action.Enable(); 
+        jumpAction.action.Enable();
+        aimAction.action.Enable();
     }
     private void OnDisable()
     { 
-        moveAction.action.Disable(); jumpAction.action.Disable(); 
+        moveAction.action.Disable(); 
+        jumpAction.action.Disable();
+        aimAction.action.Disable();
     }
 
     private void FixedUpdate()
     {
         // Read Vector2 and use x only for horizontal move
-        Vector2 move = moveAction.action.ReadValue<Vector2>();
+        move = moveAction.action.ReadValue<Vector2>();
         rb.linearVelocity = new Vector2(move.x * moveSpeed, rb.linearVelocity.y);
 
         if(move.x != 0f)
@@ -60,41 +69,35 @@ public class PlayerController : MonoBehaviour
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
         }
 
-        Vector2 aimDirection = moveAction.action.ReadValue<Vector2>();
+        Vector2 aimDirection = Vector2.zero;
+        aimDirection = aimAction.action.ReadValue<Vector2>();
 
-        if (aimDirection.y > 0.1f)
+        isAimingUp = aimDirection.y >= aimUpEnter;
+
+        if(isAimingUp)
         {
-            anim.SetBool("isAimingUp", true);
+            isAimingUp = !(aimDirection.y < aimUpExit);
         }
         else
         {
-            anim.SetBool("isAimingUp", false);
+            isAimingUp = aimDirection.y > aimUpEnter;
         }
+
+        SetBoolIfChanged("isAimingUp", isAimingUp);
+        SetBoolIfChanged("isGrounded", grounded);
+        anim.SetFloat("moveX", Mathf.Abs(rb.linearVelocityX));
+        SetBoolIfChanged("isWalking", Mathf.Abs(rb.linearVelocityX) > 0.1f);
     }
 
     public Vector2 GetAimDir()
     {
-        Vector2 forward = new Vector2(transform.localScale.x >= 0f ? 1f : -1f, 0f);
-        if (moveAction == null)
-        {
-            return forward;
-        }
+        if (isAimingUp) return Vector2.up;
+        return new Vector2(transform.localScale.x >= 0f ? 1f : -1f, 0f);
+    }
 
-        Vector2 aim = moveAction.action.ReadValue<Vector2>();
-        if (aim.sqrMagnitude < 0.01f)
-        {
-            return forward;
-        }
-
-        // Snap up if Y dominates and is positive
-        if (Mathf.Abs(aim.y) > Mathf.Abs(aim.x) && aim.y > 0f)
-        {
-            return Vector2.up;
-        }
-        else
-        { 
-            return forward;    
-        }
+    private void SetBoolIfChanged(string param, bool value)
+    {
+        if (anim.GetBool(param) != value) anim.SetBool(param, value);
     }
 
     private void OnDrawGizmosSelected()
