@@ -19,11 +19,15 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float groundRadius = 0.15f;
     [SerializeField] private LayerMask groundMask;
 
+    public int Health;
+    public int maxHealth = 3;
+
     private Rigidbody2D rb;
     private Animator anim;
     private bool isFacingRight = true;
     private Vector2 move;
     private bool isAimingUp = false;
+    private UIController uiController;
 
     private void Awake()
     {
@@ -42,6 +46,21 @@ public class PlayerController : MonoBehaviour
         moveAction.action.Disable(); 
         jumpAction.action.Disable();
         aimAction.action.Disable();
+    }
+
+    private void Start()
+    {
+        Health = maxHealth;
+
+        uiController = FindFirstObjectByType<UIController>();
+        if (uiController == null)
+        {
+            Debug.LogError("UIController not found in the scene.");
+        }
+        else
+        {
+            uiController.UpdateHealthDisplay(Health);
+        }
     }
 
     private void FixedUpdate()
@@ -89,6 +108,28 @@ public class PlayerController : MonoBehaviour
         SetBoolIfChanged("isWalking", Mathf.Abs(rb.linearVelocityX) > 0.1f);
     }
 
+    public void TakeDamage(int damage)
+    {
+        Health -= damage;
+        if (Health <= 0)
+        {
+            Health = 0;
+            uiController.UpdateHealthDisplay(Health);
+            Debug.Log("Player has died.");
+        }
+        else
+        {
+            uiController.UpdateHealthDisplay(Health);
+        }
+    }
+
+    public void Heal(int amount)
+    {
+        if (Health >= maxHealth) return;
+        Health += amount;
+        uiController.UpdateHealthDisplay(Health);
+    }
+
     public Vector2 GetAimDir()
     {
         if (isAimingUp) return Vector2.up;
@@ -98,6 +139,14 @@ public class PlayerController : MonoBehaviour
     private void SetBoolIfChanged(string param, bool value)
     {
         if (anim.GetBool(param) != value) anim.SetBool(param, value);
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Enemy"))
+        {
+            TakeDamage(1);
+        }
     }
 
     private void OnDrawGizmosSelected()
