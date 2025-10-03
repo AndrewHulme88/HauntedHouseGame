@@ -11,6 +11,7 @@ public class EnemyGhostController : MonoBehaviour
     [SerializeField] private float waypointRadius = 0.25f;
     [SerializeField] private Vector2 dwellTimeRange = new Vector2(0.4f, 1.2f); // pause at waypoint
     [SerializeField] private float retargetEvery = 4f;   // failsafe: pick a new target if stuck
+    [SerializeField] private bool isFacingRight = true;
 
     [Header("Avoidance")]
     [SerializeField] private LayerMask obstacleMask;      // walls/solid tiles
@@ -97,6 +98,21 @@ public class EnemyGhostController : MonoBehaviour
 
         Vector2 finalVel = desired + steer * avoidStrength;
         rb.linearVelocity = finalVel + HoverOffset();
+
+        const float eps = 0.3f; // deadzone
+        float velocityX = rb.linearVelocity.x;
+
+        if (Mathf.Abs(velocityX) > eps)
+        {
+            bool faceRight = velocityX > 0f;
+            if (faceRight != isFacingRight)
+            {
+                isFacingRight = faceRight;
+                var scale = transform.localScale;
+                scale.x = Mathf.Abs(scale.x) * (isFacingRight ? -1f : 1f);
+                transform.localScale = scale;
+            }
+        }
     }
 
     private void HandleCapturableChanged(bool isCapturable)
