@@ -22,6 +22,7 @@ public class VacuumController : MonoBehaviour
 
     private PlayerController playerController;
     private Vector3 beamBaseScale;
+    private bool vacuumActive;
 
     private void Awake()
     {
@@ -45,33 +46,67 @@ public class VacuumController : MonoBehaviour
 
     private void OnDisable() 
     { 
-        vacuumAction.action.Disable(); 
+        vacuumAction.action.Disable();
+        vacuumActive = false;
+        if (beamVFX && beamVFX.activeSelf) beamVFX.SetActive(false);
     }
 
     private void Update()
     {
-        bool active = vacuumAction.action.IsPressed();
+        if (!beamVFX) return;
 
-        if (beamVFX)
+        if (!vacuumActive)
         {
-            beamVFX.SetActive(active);
+            if (beamVFX.activeSelf) beamVFX.SetActive(false);
+            return;
         }
 
-        if (active && beamVFX)
-        {
-            UpdateBeamPose(maxRange);
-        }
+        if (!beamVFX.activeSelf) beamVFX.SetActive(true);
+        //bool active = vacuumAction.action.IsPressed();
+
+        //if (beamVFX)
+        //{
+        //    beamVFX.SetActive(active);
+        //}
+
+        //if (active && beamVFX)
+        //{
+        //    UpdateBeamPose(maxRange);
+        //}
     }
 
     private void FixedUpdate()
     {
-        if (!vacuumAction.action.IsPressed()) return;
+        bool torchActive = playerController && playerController.isUsingTorch;
+
+        // Read raw button
+        bool pressedRaw = vacuumAction.action.IsPressed();
+
+        // Gate: vacuum only “pressed” if torch is NOT active
+        bool pressed = pressedRaw && !torchActive;
+        vacuumActive = pressed;
+
+        if (!pressed)
+        {
+            // ensure vacuum is OFF
+            if (playerController.isUsingVacuum)
+                playerController.isUsingVacuum = false;
+
+            playerController.isUsingWeapon = playerController.isUsingTorch || playerController.isUsingVacuum;
+
+            if (beamVFX && beamVFX.activeSelf) beamVFX.SetActive(false);
+            return; // <<< nothing else runs
+        }
+
+        // activate vacuum
+        playerController.isUsingVacuum = true;
+        playerController.isUsingWeapon = playerController.isUsingTorch || playerController.isUsingVacuum;
 
         Vector2 origin = suctionOrigin.position;
         Vector2 aim = playerController ? playerController.GetAimDir() : Vector2.right;
 
-        float bestDist = Mathf.Infinity;
-        Vector2 bestPoint = origin;
+        float bestDist = maxRange;
+        Vector2 bestPoint = origin + aim.normalized * maxRange;
 
         // ---- Stunned ghosts: pull-only (same as pickups) ----
         var ghosts = Physics2D.OverlapCircleAll(origin, maxRange, ghostMask);
@@ -137,7 +172,7 @@ public class VacuumController : MonoBehaviour
         }
 
         // ---- Beam shortening works for either ghosts or pickups ----
-        if (beamVFX && bestDist < Mathf.Infinity)
+        if (vacuumActive && beamVFX)
             UpdateBeamPose(bestDist, bestPoint);
     }
 

@@ -21,6 +21,9 @@ public class PlayerController : MonoBehaviour
 
     public int Health;
     public int maxHealth = 3;
+    public bool isUsingWeapon = false;
+    public bool isUsingVacuum = false;
+    public bool isUsingTorch = false;
 
     private Rigidbody2D rb;
     private Animator anim;
@@ -69,7 +72,7 @@ public class PlayerController : MonoBehaviour
         move = moveAction.action.ReadValue<Vector2>();
         rb.linearVelocity = new Vector2(move.x * moveSpeed, rb.linearVelocity.y);
 
-        if(move.x != 0f)
+        if(move.x != 0f  && !isUsingWeapon)
         {
             isFacingRight = move.x > 0f;
             Vector3 scale = transform.localScale;

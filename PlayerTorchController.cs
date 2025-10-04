@@ -57,7 +57,8 @@ public class PlayerTorchController : MonoBehaviour
     private void Update()
     {
         float dt = Time.deltaTime;
-        bool pressed = torchAction.action.IsPressed();
+        bool pressedRaw = torchAction.action.IsPressed();
+        bool pressed = pressedRaw && !playerController.isUsingVacuum;
 
         if (isChanneling)
         {
@@ -110,8 +111,10 @@ public class PlayerTorchController : MonoBehaviour
                     energy = Mathf.Min(maxEnergy, energy + rechargePerSecond * dt);
             }
 
-            if (pressed && !outOfEnergy && energy >= minEnergyToStart)
+            bool anyWeaponActive = playerController != null && playerController.isUsingWeapon;
+            if (pressed && !anyWeaponActive && !outOfEnergy && energy >= minEnergyToStart)
                 StartChannel();
+
 
             if (flashVFX && flashVFX.activeSelf) flashVFX.SetActive(false);
         }
@@ -128,18 +131,25 @@ public class PlayerTorchController : MonoBehaviour
 
     private void StartChannel()
     {
+        // refuse if vacuum is active
+        if (playerController.isUsingVacuum) return;
+
         isChanneling = true;
-        tickTimer = 0f; 
-        if (flashVFX)
-        {
-            UpdateVFXPose();
-            flashVFX.SetActive(true);
-        }
+
+        playerController.isUsingTorch = true;
+        playerController.isUsingWeapon = playerController.isUsingTorch || playerController.isUsingVacuum;
+
+        tickTimer = 0f;
+        if (flashVFX) { UpdateVFXPose(); flashVFX.SetActive(true); }
     }
 
     private void StopChannel()
     {
         isChanneling = false;
+
+        playerController.isUsingTorch = false;
+        playerController.isUsingWeapon = playerController.isUsingTorch || playerController.isUsingVacuum;
+
         tickTimer = 0f;
         if (flashVFX) flashVFX.SetActive(false);
     }
