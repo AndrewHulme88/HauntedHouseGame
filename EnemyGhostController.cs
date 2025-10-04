@@ -79,23 +79,23 @@ public class EnemyGhostController : MonoBehaviour
         }
 
         // Desired velocity toward target
-        Vector2 pos = rb.position;
-        Vector2 desired = (target - pos).normalized * moveSpeed;
+        Vector2 currentPosition = rb.position;
+        Vector2 desiredVelocity = (target - currentPosition).normalized * moveSpeed;
 
         // Simple obstacle avoidance (one forward ray + two slight side rays)
-        Vector2 fwd = desired.normalized;
-        Vector2 steer = Vector2.zero;
-        steer += AvoidRay(pos, fwd, lookAheadDistance);
-        steer += AvoidRay(pos, Rotate(fwd, 20f), lookAheadDistance * 0.85f);
-        steer += AvoidRay(pos, Rotate(fwd, -20f), lookAheadDistance * 0.85f);
+        Vector2 forwardDirection = desiredVelocity.normalized;
+        Vector2 avoidanceSteering = Vector2.zero;
+        avoidanceSteering += AvoidRay(currentPosition, forwardDirection, lookAheadDistance);
+        avoidanceSteering += AvoidRay(currentPosition, Rotate(forwardDirection, 20f), lookAheadDistance * 0.85f);
+        avoidanceSteering += AvoidRay(currentPosition, Rotate(forwardDirection, -20f), lookAheadDistance * 0.85f);
 
-        Vector2 finalVel = desired + steer * avoidDistance;
-        rb.linearVelocity = finalVel + HoverOffset();
+        Vector2 combinedVelocity = desiredVelocity + avoidanceSteering * avoidDistance;
+        rb.linearVelocity = combinedVelocity + HoverOffset();
 
-        const float eps = 0.3f; // deadzone
+        const float flipDeadzone = 0.3f;
         float velocityX = rb.linearVelocity.x;
 
-        if (Mathf.Abs(velocityX) > eps)
+        if (Mathf.Abs(velocityX) > flipDeadzone)
         {
             bool faceRight = velocityX > 0f;
             if (faceRight != isFacingRight)
@@ -134,13 +134,13 @@ public class EnemyGhostController : MonoBehaviour
         }
         else
         {
-            Bounds b = roomBounds.bounds;
+            Bounds bounds = roomBounds.bounds;
             // Keep some margin from walls
-            float mx = Mathf.Min(0.6f, b.extents.x * 0.5f);
-            float my = Mathf.Min(0.6f, b.extents.y * 0.5f);
-            float x = Random.Range(b.min.x + mx, b.max.x - mx);
-            float y = Random.Range(b.min.y + my, b.max.y - my);
-            target = new Vector2(x, y);
+            float minX = Mathf.Min(0.6f, bounds.extents.x * 0.5f);
+            float minY = Mathf.Min(0.6f, bounds.extents.y * 0.5f);
+            float targetX = Random.Range(bounds.min.x + minX, bounds.max.x - minX);
+            float targetY = Random.Range(bounds.min.y + minY, bounds.max.y - minY);
+            target = new Vector2(targetX, targetY);
         }
 
         retargetTime = Time.time + retargetDelay;

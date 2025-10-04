@@ -68,7 +68,6 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        // Read Vector2 and use x only for horizontal move
         move = moveAction.action.ReadValue<Vector2>();
         rb.linearVelocity = new Vector2(move.x * moveSpeed, rb.linearVelocity.y);
 
@@ -83,7 +82,6 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        // Ground check + jump
         bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundRadius, groundMask);
 
         if (grounded && jumpAction.action.WasPressedThisFrame())

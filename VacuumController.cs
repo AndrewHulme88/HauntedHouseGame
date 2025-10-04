@@ -14,7 +14,7 @@ public class VacuumController : MonoBehaviour
     [Header("Effects")]
     [SerializeField] private float pullForce = 25f;            
     [SerializeField] private LayerMask ghostMask;
-    [SerializeField] private LayerMask obstacleMask;            // walls/geometry blocking LOS
+    [SerializeField] private LayerMask obstacleMask; // walls/geometry blocking LOS
     [SerializeField] private LayerMask pickupMask;
     [SerializeField] private GameObject beamVFX;
     [SerializeField] private float collectRadius = 0.6f;
@@ -62,27 +62,12 @@ public class VacuumController : MonoBehaviour
         }
 
         if (!beamVFX.activeSelf) beamVFX.SetActive(true);
-        //bool active = vacuumAction.action.IsPressed();
-
-        //if (beamVFX)
-        //{
-        //    beamVFX.SetActive(active);
-        //}
-
-        //if (active && beamVFX)
-        //{
-        //    UpdateBeamPose(maxRange);
-        //}
     }
 
     private void FixedUpdate()
     {
         bool torchActive = playerController && playerController.isUsingTorch;
-
-        // Read raw button
         bool pressedRaw = vacuumAction.action.IsPressed();
-
-        // Gate: vacuum only “pressed” if torch is NOT active
         bool pressed = pressedRaw && !torchActive;
         vacuumActive = pressed;
 
@@ -95,7 +80,7 @@ public class VacuumController : MonoBehaviour
             playerController.isUsingWeapon = playerController.isUsingTorch || playerController.isUsingVacuum;
 
             if (beamVFX && beamVFX.activeSelf) beamVFX.SetActive(false);
-            return; // <<< nothing else runs
+            return; 
         }
 
         // activate vacuum
@@ -103,29 +88,28 @@ public class VacuumController : MonoBehaviour
         playerController.isUsingWeapon = playerController.isUsingTorch || playerController.isUsingVacuum;
 
         Vector2 origin = suctionOrigin.position;
-        Vector2 aim = playerController ? playerController.GetAimDir() : Vector2.right;
+        Vector2 aimDirection = playerController ? playerController.GetAimDir() : Vector2.right;
 
-        float bestDist = maxRange;
-        Vector2 bestPoint = origin + aim.normalized * maxRange;
+        float nearestDistance = maxRange;
+        Vector2 nearestPoint = origin + aimDirection.normalized * maxRange;
 
-        // ---- Stunned ghosts: pull-only (same as pickups) ----
         var ghosts = Physics2D.OverlapCircleAll(origin, maxRange, ghostMask);
         foreach (var col in ghosts)
         {
             if (!col) continue;
             if (!col.TryGetComponent<EnemyGhostController>(out var ghost) || !ghost.isCapturable) continue;
 
-            Vector2 to = (Vector2)col.bounds.center - origin;
-            float dist = to.magnitude; if (dist <= 0.001f) continue;
-            if (Vector2.Angle(aim, to / dist) > coneAngleDeg * 0.5f) continue;
-            if (Physics2D.Raycast(origin, to / dist, dist, obstacleMask)) continue;
+            Vector2 vectorToTarget = (Vector2)col.bounds.center - origin;
+            float distance = vectorToTarget.magnitude; if (distance <= 0.001f) continue;
+            if (Vector2.Angle(aimDirection, vectorToTarget / distance) > coneAngleDeg * 0.5f) continue;
+            if (Physics2D.Raycast(origin, vectorToTarget / distance, distance, obstacleMask)) continue;
 
-            var rb2d = col.attachedRigidbody;
-            if (rb2d)
+            var targetRb = col.attachedRigidbody;
+            if (targetRb)
             {
-                Vector2 dir = -(to / dist);
-                float falloff = Mathf.Clamp01(1f - dist / maxRange);
-                rb2d.AddForce(dir * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
+                Vector2 direction = -(vectorToTarget / distance);
+                float falloff = Mathf.Clamp01(1f - distance / maxRange);
+                targetRb.AddForce(direction * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
             }
             else
             {
@@ -133,47 +117,43 @@ public class VacuumController : MonoBehaviour
                 col.transform.position += (Vector3)(dir * pickupMoveSpeed * Time.fixedDeltaTime);
             }
 
-            // >>> Capture when close enough to the suction origin
-            if (dist <= collectRadius)
+            if (distance <= collectRadius)
             {
-                // Prefer calling a method on the ghost so you can play VFX/score, etc.
                 if (ghost) ghost.Capture(); else Destroy(col.gameObject);
-                continue; // this collider is gone now
+                continue;
             }
 
-            if (dist < bestDist) { bestDist = dist; bestPoint = (Vector2)col.bounds.center; }
+            if (distance < nearestDistance) { nearestDistance = distance; nearestPoint = (Vector2)col.bounds.center; }
         }
 
-        // ---- Pickups (pull-only) ----
         var items = Physics2D.OverlapCircleAll(origin, maxRange, pickupMask);
         foreach (var col in items)
         {
             if (!col) continue;
 
-            Vector2 to = (Vector2)col.bounds.center - origin;
-            float dist = to.magnitude; if (dist <= 0.001f) continue;
-            if (Vector2.Angle(aim, to / dist) > coneAngleDeg * 0.5f) continue;
-            if (Physics2D.Raycast(origin, to / dist, dist, obstacleMask)) continue;
+            Vector2 vectorToTarget = (Vector2)col.bounds.center - origin;
+            float distance = vectorToTarget.magnitude; if (distance <= 0.001f) continue;
+            if (Vector2.Angle(aimDirection, vectorToTarget / distance) > coneAngleDeg * 0.5f) continue;
+            if (Physics2D.Raycast(origin, vectorToTarget / distance, distance, obstacleMask)) continue;
 
-            var rb2d = col.attachedRigidbody;
-            if (rb2d)
+            var targetRb = col.attachedRigidbody;
+            if (targetRb)
             {
-                Vector2 dir = -(to / dist);
-                float falloff = Mathf.Clamp01(1f - dist / maxRange);
-                rb2d.AddForce(dir * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
+                Vector2 direction = -(vectorToTarget / distance);
+                float falloff = Mathf.Clamp01(1f - distance / maxRange);
+                targetRb.AddForce(direction * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
             }
             else
             {
-                Vector2 dir = (origin - (Vector2)col.transform.position).normalized;
-                col.transform.position += (Vector3)(dir * pickupMoveSpeed * Time.fixedDeltaTime);
+                Vector2 direction = (origin - (Vector2)col.transform.position).normalized;
+                col.transform.position += (Vector3)(direction * pickupMoveSpeed * Time.fixedDeltaTime);
             }
 
-            if (dist < bestDist) { bestDist = dist; bestPoint = (Vector2)col.bounds.center; }
+            if (distance < nearestDistance) { nearestDistance = distance; nearestPoint = (Vector2)col.bounds.center; }
         }
 
-        // ---- Beam shortening works for either ghosts or pickups ----
         if (vacuumActive && beamVFX)
-            UpdateBeamPose(bestDist, bestPoint);
+            UpdateBeamPose(nearestDistance, nearestPoint);
     }
 
 
@@ -182,13 +162,13 @@ public class VacuumController : MonoBehaviour
         Vector2 origin = suctionOrigin.position;
         Vector2 aim = playerController ? playerController.GetAimDir() : Vector2.right;
 
-        Vector2 end = toPoint.HasValue ? toPoint.Value : origin + aim.normalized * length;
-        Vector2 mid = (origin + end) * 0.5f;
-        Vector2 dir = (end - origin);
-        float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        Vector2 endPoint = toPoint.HasValue ? toPoint.Value : origin + aim.normalized * length;
+        Vector2 midPoint = (origin + endPoint) * 0.5f;
+        Vector2 aimDirection = (endPoint - origin);
+        float angleDeg = Mathf.Atan2(aimDirection.y, aimDirection.x) * Mathf.Rad2Deg;
 
-        beamVFX.transform.position = mid;
-        beamVFX.transform.rotation = Quaternion.Euler(0f, 0f, ang);
+        beamVFX.transform.position = midPoint;
+        beamVFX.transform.rotation = Quaternion.Euler(0f, 0f, angleDeg);
 
         // Assumes the beam sprite is 1 unit long on X; scale X to length
         beamVFX.transform.localScale = new Vector3(length, beamBaseScale.y, beamBaseScale.z);
@@ -197,19 +177,19 @@ public class VacuumController : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         if (!suctionOrigin) return;
-        var origin = (Vector2)suctionOrigin.position;
-        Vector2 aim = Application.isPlaying && playerController ? playerController.GetAimDir()
+        var originPosition = (Vector2)suctionOrigin.position;
+        Vector2 aimDirection = Application.isPlaying && playerController ? playerController.GetAimDir()
                                                       : new Vector2(transform.localScale.x >= 0f ? 1f : -1f, 0f);
 
         // Draw cone
         Gizmos.color = new Color(0.3f, 0.8f, 1f, 0.6f);
-        float half = coneAngleDeg * 0.5f;
-        Quaternion qL = Quaternion.Euler(0, 0, half);
-        Quaternion qR = Quaternion.Euler(0, 0, -half);
-        Vector2 vL = (Vector2)(qL * (Vector3)aim).normalized * maxRange;
-        Vector2 vR = (Vector2)(qR * (Vector3)aim).normalized * maxRange;
-        Gizmos.DrawLine(origin, origin + vL);
-        Gizmos.DrawLine(origin, origin + vR);
-        Gizmos.DrawWireSphere(origin, 0.07f);
+        float halfConeAngleDegrees = coneAngleDeg * 0.5f;
+        Quaternion quaternionLeft = Quaternion.Euler(0, 0, halfConeAngleDegrees);
+        Quaternion quaternionRight = Quaternion.Euler(0, 0, -halfConeAngleDegrees);
+        Vector2 leftEdgeDirection = (Vector2)(quaternionLeft * (Vector3)aimDirection).normalized * maxRange;
+        Vector2 rightEdgeDirection = (Vector2)(quaternionRight * (Vector3)aimDirection).normalized * maxRange;
+        Gizmos.DrawLine(originPosition, originPosition + leftEdgeDirection);
+        Gizmos.DrawLine(originPosition, originPosition + rightEdgeDirection);
+        Gizmos.DrawWireSphere(originPosition, 0.07f);
     }
 }

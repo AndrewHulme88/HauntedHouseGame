@@ -32,7 +32,7 @@ public class PlayerTorchController : MonoBehaviour
     private bool outOfEnergy;                
     private float rechargeReadyTime = 0f;    
     private bool prevPressed = false;
-    private float lastEnergy01 = -1f;
+    private float previousEnergyNormalized = -1f;
 
     private void Awake()
     {
@@ -121,11 +121,11 @@ public class PlayerTorchController : MonoBehaviour
 
         prevPressed = pressed;
 
-        float e01 = maxEnergy > 0f ? energy / maxEnergy : 0f;
-        if (!Mathf.Approximately(e01, lastEnergy01))
+        float currentEnergyNormalized = maxEnergy > 0f ? energy / maxEnergy : 0f;
+        if (!Mathf.Approximately(currentEnergyNormalized, previousEnergyNormalized))
         {
             uiController?.UpdateTorchDisplay(energy, maxEnergy);
-            lastEnergy01 = e01;
+            previousEnergyNormalized = currentEnergyNormalized;
         }
     }
 
@@ -195,8 +195,6 @@ public class PlayerTorchController : MonoBehaviour
             dir.y * (size.y * 0.5f)
         );
     }
-
-    public float Energy01 => maxEnergy > 0f ? energy / maxEnergy : 0f;
 
     private void OnDrawGizmosSelected()
     {
