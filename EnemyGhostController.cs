@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Unity.VisualScripting.Antlr3.Runtime;
 using UnityEngine;
 
@@ -22,6 +23,8 @@ public class EnemyGhostController : MonoBehaviour
     [SerializeField] private float hoverAmplitude = 0.05f;
     [SerializeField] private float hoverSpeed = 3f;
 
+    public bool isCapturable = false;
+
     private Rigidbody2D rb;
     private Vector2 target;
     private float dwellUntil;
@@ -29,7 +32,6 @@ public class EnemyGhostController : MonoBehaviour
     private float hoverPhase;
     private bool isPaused = false;
     private bool isStunned = false;
-    private EnemySuck enemySuck;
 
     private void Awake()
     {
@@ -40,19 +42,8 @@ public class EnemyGhostController : MonoBehaviour
             Debug.LogWarning($"{name}: roomBounds not set on GhostRoam2D.");
         }
 
-        enemySuck = GetComponent<EnemySuck>();
         PickNewTarget();
         hoverPhase = Random.value * Mathf.PI * 2f;
-    }
-
-    private void OnEnable()
-    {
-        if (enemySuck != null) enemySuck.OnCapturableChanged += HandleCapturableChanged;
-    }
-
-    private void OnDisable()
-    {
-        if (enemySuck != null) enemySuck.OnCapturableChanged -= HandleCapturableChanged;
     }
 
     private void FixedUpdate()
@@ -115,14 +106,20 @@ public class EnemyGhostController : MonoBehaviour
         }
     }
 
-    private void HandleCapturableChanged(bool isCapturable)
+    public void SetCapturable(bool value)
     {
+        isCapturable = value;
         isPaused = isCapturable;
-        if (isPaused)
+        if (isCapturable)
         {
-            // Stop autonomous motion so vacuum can take over
             rb.linearVelocity = Vector2.zero;
         }
+    }
+
+    public void Capture()
+    {
+        // TODO: play particles / sound / award points
+        Destroy(gameObject);
     }
 
     private void PickNewTarget()

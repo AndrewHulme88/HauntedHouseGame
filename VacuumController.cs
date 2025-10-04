@@ -13,10 +13,12 @@ public class VacuumController : MonoBehaviour
 
     [Header("Effects")]
     [SerializeField] private float pullForce = 25f;            
-    [SerializeField] private float captureDps = 1.2f;           // progress per second while in cone
     [SerializeField] private LayerMask ghostMask;
     [SerializeField] private LayerMask obstacleMask;            // walls/geometry blocking LOS
-    [SerializeField] private GameObject beamVFX;                
+    [SerializeField] private LayerMask pickupMask;
+    [SerializeField] private GameObject beamVFX;
+    [SerializeField] private float collectRadius = 0.6f;
+    [SerializeField] private float pickupMoveSpeed = 12f;
 
     private PlayerController playerController;
     private Vector3 beamBaseScale;
@@ -65,56 +67,80 @@ public class VacuumController : MonoBehaviour
     {
         if (!vacuumAction.action.IsPressed()) return;
 
-        Vector2 aim = playerController ? playerController.GetAimDir() : Vector2.right;
         Vector2 origin = suctionOrigin.position;
-
-        // Broadphase: circle overlap
-        Collider2D[] cols = Physics2D.OverlapCircleAll(origin, maxRange, ghostMask);
-        if (cols.Length == 0) return;
+        Vector2 aim = playerController ? playerController.GetAimDir() : Vector2.right;
 
         float bestDist = Mathf.Infinity;
         Vector2 bestPoint = origin;
 
-        foreach (var col in cols)
+        // ---- Stunned ghosts: pull-only (same as pickups) ----
+        var ghosts = Physics2D.OverlapCircleAll(origin, maxRange, ghostMask);
+        foreach (var col in ghosts)
         {
-            if (!col || !col.TryGetComponent<EnemySuck>(out var ghost) || !ghost.IsCapturable)
-                continue;
+            if (!col) continue;
+            if (!col.TryGetComponent<EnemyGhostController>(out var ghost) || !ghost.isCapturable) continue;
 
-            Vector2 toGhost = (Vector2)col.bounds.center - origin;
-            float dist = toGhost.magnitude;
-            if (dist <= 0.001f) continue;
+            Vector2 to = (Vector2)col.bounds.center - origin;
+            float dist = to.magnitude; if (dist <= 0.001f) continue;
+            if (Vector2.Angle(aim, to / dist) > coneAngleDeg * 0.5f) continue;
+            if (Physics2D.Raycast(origin, to / dist, dist, obstacleMask)) continue;
 
-            // Cone check
-            float ang = Vector2.Angle(aim, toGhost.normalized);
-            if (ang > coneAngleDeg * 0.5f) continue;
-
-            // LOS check
-            var hit = Physics2D.Raycast(origin, toGhost.normalized, dist, obstacleMask);
-            if (hit.collider) continue;
-
-            // Pull physics (if ghost has RB)
-            if (col.attachedRigidbody)
+            var rb2d = col.attachedRigidbody;
+            if (rb2d)
             {
-                // Toward origin; scale by distance a bit for feel
-                Vector2 dir = toGhost.normalized * -1f;
-                float falloff = Mathf.Clamp01(1f - (dist / maxRange));
-                col.attachedRigidbody.AddForce(dir * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
+                Vector2 dir = -(to / dist);
+                float falloff = Mathf.Clamp01(1f - dist / maxRange);
+                rb2d.AddForce(dir * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
+            }
+            else
+            {
+                Vector2 dir = (origin - (Vector2)col.transform.position).normalized;
+                col.transform.position += (Vector3)(dir * pickupMoveSpeed * Time.fixedDeltaTime);
             }
 
-            ghost.ApplyVacuumProgress(captureDps * Time.fixedDeltaTime);
-
-            // Track closest for beam shortening
-            if (dist < bestDist)
+            // >>> Capture when close enough to the suction origin
+            if (dist <= collectRadius)
             {
-                bestDist = dist;
-                bestPoint = (Vector2)col.bounds.center;
+                // Prefer calling a method on the ghost so you can play VFX/score, etc.
+                if (ghost) ghost.Capture(); else Destroy(col.gameObject);
+                continue; // this collider is gone now
             }
+
+            if (dist < bestDist) { bestDist = dist; bestPoint = (Vector2)col.bounds.center; }
         }
 
-        // Shorten the beam to the closest valid target
+        // ---- Pickups (pull-only) ----
+        var items = Physics2D.OverlapCircleAll(origin, maxRange, pickupMask);
+        foreach (var col in items)
+        {
+            if (!col) continue;
+
+            Vector2 to = (Vector2)col.bounds.center - origin;
+            float dist = to.magnitude; if (dist <= 0.001f) continue;
+            if (Vector2.Angle(aim, to / dist) > coneAngleDeg * 0.5f) continue;
+            if (Physics2D.Raycast(origin, to / dist, dist, obstacleMask)) continue;
+
+            var rb2d = col.attachedRigidbody;
+            if (rb2d)
+            {
+                Vector2 dir = -(to / dist);
+                float falloff = Mathf.Clamp01(1f - dist / maxRange);
+                rb2d.AddForce(dir * (pullForce * (0.5f + 0.5f * falloff)), ForceMode2D.Force);
+            }
+            else
+            {
+                Vector2 dir = (origin - (Vector2)col.transform.position).normalized;
+                col.transform.position += (Vector3)(dir * pickupMoveSpeed * Time.fixedDeltaTime);
+            }
+
+            if (dist < bestDist) { bestDist = dist; bestPoint = (Vector2)col.bounds.center; }
+        }
+
+        // ---- Beam shortening works for either ghosts or pickups ----
         if (beamVFX && bestDist < Mathf.Infinity)
             UpdateBeamPose(bestDist, bestPoint);
     }
+
 
     private void UpdateBeamPose(float length, Vector2? toPoint = null)
     {

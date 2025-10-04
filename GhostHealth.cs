@@ -3,26 +3,33 @@ using UnityEngine;
 public class GhostHealth : MonoBehaviour
 {
     [SerializeField] private int maxHealth = 3;
+
     private int hp;
-    private EnemySuck enemySuck;
+    private EnemyGhostController enemyGhostController;
+    private DamagePlayer damagePlayer;
 
     private void Awake() 
     { 
         hp = maxHealth;
-        enemySuck = GetComponent<EnemySuck>();
+        enemyGhostController = GetComponent<EnemyGhostController>();
+        damagePlayer = GetComponent<DamagePlayer>();
     }
 
     public void ApplyTorchDamage(int amount)
     {
         hp -= amount;
-        if (hp <= 0) Stun();
+        if (hp <= 0)
+        {
+            damagePlayer.damageAmount = 0;
+            Stun();
+        }
     }
 
     private void Stun()
     {
-        if (enemySuck != null)
+        if (enemyGhostController != null)
         {
-            enemySuck.SetCapturable(true);
+            enemyGhostController.SetCapturable(true);
         }
         else
         {
