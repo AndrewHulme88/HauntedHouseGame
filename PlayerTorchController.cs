@@ -17,20 +17,22 @@ public class PlayerTorchController : MonoBehaviour
     [SerializeField] private float damageTickInterval = 1.0f; // once per second
 
     [Header("Energy")]
-    [SerializeField] private float maxEnergy = 3f;            // seconds of channel time
-    [SerializeField] private float drainPerSecond = 1f;       // energy/s while held
-    [SerializeField] private float rechargePerSecond = 0.5f;  // energy/s while NOT held
-    [SerializeField] private float minEnergyToStart = 1f;   // gate to prevent stutter at near-zero
+    [SerializeField] private float maxEnergy = 3f;
+    [SerializeField] private float drainPerSecond = 1f;
+    [SerializeField] private float rechargePerSecond = 0.5f;
+    [SerializeField] private float minEnergyToStart = 1f;
     [SerializeField] private float rechargeDelayAfterRelease = 0.6f;
 
     private PlayerController playerController;
+    private UIController uiController;
     [SerializeField] private float energy;
     private float tickTimer;
     private bool isChanneling;
     private Vector3 vfxBaseScale;
-    private bool outOfEnergy;                 // true if we stopped because energy hit 0
-    private float rechargeReadyTime = 0f;     // when recharge may begin (after release+delay)
+    private bool outOfEnergy;                
+    private float rechargeReadyTime = 0f;    
     private bool prevPressed = false;
+    private float lastEnergy01 = -1f;
 
     private void Awake()
     {
@@ -38,6 +40,15 @@ public class PlayerTorchController : MonoBehaviour
         if (!flashOrigin) flashOrigin = transform;
         if (flashVFX) vfxBaseScale = flashVFX.transform.localScale;
         energy = maxEnergy;
+    }
+
+    private void Start()
+    {
+        uiController = FindFirstObjectByType<UIController>();
+        if (uiController == null)
+        {
+            Debug.LogError("UIController not found in the scene.");
+        }
     }
 
     private void OnEnable() { torchAction.action.Enable(); }
@@ -48,7 +59,6 @@ public class PlayerTorchController : MonoBehaviour
         float dt = Time.deltaTime;
         bool pressed = torchAction.action.IsPressed();
 
-        // --- Channeling ---
         if (isChanneling)
         {
             // drain first
@@ -63,17 +73,14 @@ public class PlayerTorchController : MonoBehaviour
                 if (depleted)
                 {
                     outOfEnergy = true;
-                    // wait for release; delay will be scheduled on release edge below
                 }
                 else
                 {
-                    // voluntary stop: can recharge immediately
                     outOfEnergy = false;
                 }
             }
             else
             {
-                // still channeling: pose + tick
                 if (flashVFX) { UpdateVFXPose(); if (!flashVFX.activeSelf) flashVFX.SetActive(true); }
                 tickTimer += dt;
                 if (tickTimer >= damageTickInterval)
@@ -85,11 +92,8 @@ public class PlayerTorchController : MonoBehaviour
         }
         else
         {
-            // --- Not channeling ---
-            // If we ran out of energy, only start recharge AFTER release + delay.
             if (outOfEnergy)
             {
-                // On release edge, schedule the recharge window.
                 if (prevPressed && !pressed)
                     rechargeReadyTime = Time.time + rechargeDelayAfterRelease;
 
@@ -97,18 +101,15 @@ public class PlayerTorchController : MonoBehaviour
                 if (canRechargeNow)
                 {
                     energy = Mathf.Min(maxEnergy, energy + rechargePerSecond * dt);
-                    // once we’ve started recharging a bit, we’re no longer “locked out”
                     if (energy > 0f) outOfEnergy = false;
                 }
             }
             else
             {
-                // Normal recharge (wasn’t depleted)
                 if (!pressed && energy < maxEnergy)
                     energy = Mathf.Min(maxEnergy, energy + rechargePerSecond * dt);
             }
 
-            // Try to (re)start channel only if enough energy and not locked out
             if (pressed && !outOfEnergy && energy >= minEnergyToStart)
                 StartChannel();
 
@@ -116,13 +117,19 @@ public class PlayerTorchController : MonoBehaviour
         }
 
         prevPressed = pressed;
+
+        float e01 = maxEnergy > 0f ? energy / maxEnergy : 0f;
+        if (!Mathf.Approximately(e01, lastEnergy01))
+        {
+            uiController?.UpdateTorchDisplay(energy, maxEnergy);
+            lastEnergy01 = e01;
+        }
     }
 
-    // Helpers:
     private void StartChannel()
     {
         isChanneling = true;
-        tickTimer = 0f; // or negative for spin-up, e.g., -0.2f
+        tickTimer = 0f; 
         if (flashVFX)
         {
             UpdateVFXPose();
@@ -137,7 +144,6 @@ public class PlayerTorchController : MonoBehaviour
         if (flashVFX) flashVFX.SetActive(false);
     }
 
-    // ------ Damage & geometry ------
     void DamageInAimDirection()
     {
         ComputeFlashGeometry(out var center, out var size, out _);
@@ -180,7 +186,6 @@ public class PlayerTorchController : MonoBehaviour
         );
     }
 
-    // Optional: expose for UI bars
     public float Energy01 => maxEnergy > 0f ? energy / maxEnergy : 0f;
 
     private void OnDrawGizmosSelected()
