@@ -33,11 +33,13 @@ public class EnemyGhostController : MonoBehaviour
     private bool isPaused = false;
     private bool isStunned = false;
     private Collider2D enemyCollider;
+    private Animator anim;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         enemyCollider = GetComponent<Collider2D>();
+        anim = GetComponent<Animator>();
 
         if (!roomBounds)
         {
@@ -106,6 +108,11 @@ public class EnemyGhostController : MonoBehaviour
                 transform.localScale = scale;
             }
         }
+    }
+
+    private void Update()
+    {
+        anim.SetBool("isStunned", isStunned);
     }
 
     public void SetCapturable(bool value)
