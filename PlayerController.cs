@@ -24,6 +24,7 @@ public class PlayerController : MonoBehaviour
     public bool isUsingWeapon = false;
     public bool isUsingVacuum = false;
     public bool isUsingTorch = false;
+    public float hitInvincibilityDuration = 0.5f;
 
     private Rigidbody2D rb;
     private Animator anim;
@@ -31,6 +32,7 @@ public class PlayerController : MonoBehaviour
     private Vector2 move;
     private bool isAimingUp = false;
     private UIController uiController;
+    private float hitInvincibilityTimer;
 
     private void Awake()
     {
@@ -54,6 +56,7 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         Health = maxHealth;
+        hitInvincibilityTimer = 0f;
 
         uiController = FindFirstObjectByType<UIController>();
         if (uiController == null)
@@ -82,6 +85,11 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        if (hitInvincibilityTimer > 0f)
+        {
+            hitInvincibilityTimer -= Time.deltaTime;
+        }
+
         bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundRadius, groundMask);
 
         if (grounded && jumpAction.action.WasPressedThisFrame())
@@ -111,7 +119,12 @@ public class PlayerController : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
+        if (hitInvincibilityTimer > 0f) return;
+
+        //anim.SetTrigger("hit");
+        hitInvincibilityTimer = hitInvincibilityDuration;
         Health -= damage;
+
         if (Health <= 0)
         {
             Health = 0;
