@@ -24,6 +24,7 @@ public class PlayerController : MonoBehaviour
     [Header("Weapon")]
     [SerializeField] GameObject bulletPrefab;
     [SerializeField] Transform firePoint;
+    [SerializeField] Transform firePointUp;
 
     [Header("Damage")]
     [SerializeField] private float knockbackForce = 5f;
@@ -137,7 +138,7 @@ public class PlayerController : MonoBehaviour
 
         if (shootAction.action.WasPressedThisFrame())
         {
-            Shoot(aimDirection);
+            Shoot();
         }
 
         SetBoolIfChanged("isAimingUp", isAimingUp);
@@ -146,11 +147,15 @@ public class PlayerController : MonoBehaviour
         SetBoolIfChanged("isWalking", Mathf.Abs(rb.linearVelocity.x) > 0.1f);
     }
 
-    private void Shoot(Vector2 aimDirection)
+    private void Shoot()
     {
-        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
-        bullet.GetComponent<PlayerProjectile>().Initialize(aimDirection.normalized);
+        Vector2 fireDir = GetAimDir();
+        Transform spawnPoint = isAimingUp && firePointUp ? firePointUp : firePoint;
+
+        GameObject bullet = Instantiate(bulletPrefab, spawnPoint.position, Quaternion.identity);
+        bullet.GetComponent<PlayerProjectile>().Initialize(fireDir);
     }
+
 
     public void TakeDamage(int damage)
     {
