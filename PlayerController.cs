@@ -215,6 +215,13 @@ public class PlayerController : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Enemy"))
         {
+            EnemyGhostController enemy = collision.gameObject.GetComponent<EnemyGhostController>();
+
+            if (enemy != null && enemy.isCapturable)
+            {
+                return;
+            }
+
             ApplyKnockback(collision.transform.position);
             int damage = collision.gameObject.GetComponent<DamagePlayer>().GetDamageAmount();
             TakeDamage(damage);
@@ -225,6 +232,13 @@ public class PlayerController : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Enemy"))
         {
+            EnemyGhostController enemy = collision.gameObject.GetComponent<EnemyGhostController>();
+
+            if (enemy != null && enemy.isCapturable)
+            {
+                return;
+            }
+
             ApplyKnockback(collision.transform.position);
             int damage = collision.gameObject.GetComponent<DamagePlayer>().GetDamageAmount();
             TakeDamage(damage);
