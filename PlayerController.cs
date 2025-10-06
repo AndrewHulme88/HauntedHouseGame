@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -7,6 +8,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private InputActionReference moveAction;   
     [SerializeField] private InputActionReference jumpAction;
     [SerializeField] private InputActionReference aimAction;
+    [SerializeField] private InputActionReference shootAction;
 
     [Header("Tuning")]
     [SerializeField] private float moveSpeed = 8f;
@@ -19,12 +21,21 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float groundRadius = 0.15f;
     [SerializeField] private LayerMask groundMask;
 
+    [Header("Weapon")]
+    [SerializeField] GameObject bulletPrefab;
+    [SerializeField] Transform firePoint;
+
+    [Header("Damage")]
+    [SerializeField] private float knockbackForce = 5f;
+    [SerializeField] private float knockbackDuration = 0.2f;
+    [SerializeField] private float hitInvincibilityDuration = 0.5f;
+
     public int Health;
     public int maxHealth = 3;
     public bool isUsingWeapon = false;
     public bool isUsingVacuum = false;
     public bool isUsingTorch = false;
-    public float hitInvincibilityDuration = 0.5f;
+    
 
     private Rigidbody2D rb;
     private Animator anim;
@@ -33,6 +44,7 @@ public class PlayerController : MonoBehaviour
     private bool isAimingUp = false;
     private UIController uiController;
     private float hitInvincibilityTimer;
+    private bool isKnockedBack = false;
 
     private void Awake()
     {
@@ -45,12 +57,14 @@ public class PlayerController : MonoBehaviour
         moveAction.action.Enable(); 
         jumpAction.action.Enable();
         aimAction.action.Enable();
+        shootAction.action.Enable();
     }
     private void OnDisable()
     { 
         moveAction.action.Disable(); 
         jumpAction.action.Disable();
         aimAction.action.Disable();
+        shootAction.action.Disable();
     }
 
     private void Start()
@@ -71,6 +85,11 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (isKnockedBack)
+        {
+            return;
+        }
+
         move = moveAction.action.ReadValue<Vector2>();
         rb.linearVelocity = new Vector2(move.x * moveSpeed, rb.linearVelocity.y);
 
@@ -88,6 +107,11 @@ public class PlayerController : MonoBehaviour
         if (hitInvincibilityTimer > 0f)
         {
             hitInvincibilityTimer -= Time.deltaTime;
+        }
+        
+        if(isKnockedBack)
+        {
+            return;
         }
 
         bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundRadius, groundMask);
@@ -111,17 +135,27 @@ public class PlayerController : MonoBehaviour
             isAimingUp = aimDirection.y > aimUpEnter;
         }
 
+        if (shootAction.action.WasPressedThisFrame())
+        {
+            Shoot(aimDirection);
+        }
+
         SetBoolIfChanged("isAimingUp", isAimingUp);
         SetBoolIfChanged("isGrounded", grounded);
-        anim.SetFloat("moveX", Mathf.Abs(rb.linearVelocityX));
-        SetBoolIfChanged("isWalking", Mathf.Abs(rb.linearVelocityX) > 0.1f);
+        anim.SetFloat("moveX", Mathf.Abs(rb.linearVelocity.x));
+        SetBoolIfChanged("isWalking", Mathf.Abs(rb.linearVelocity.x) > 0.1f);
+    }
+
+    private void Shoot(Vector2 aimDirection)
+    {
+        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+        bullet.GetComponent<PlayerProjectile>().Initialize(aimDirection.normalized);
     }
 
     public void TakeDamage(int damage)
     {
         if (hitInvincibilityTimer > 0f) return;
 
-        //anim.SetTrigger("hit");
         hitInvincibilityTimer = hitInvincibilityDuration;
         Health -= damage;
 
@@ -135,6 +169,28 @@ public class PlayerController : MonoBehaviour
         {
             uiController.UpdateHealthDisplay(Health);
         }
+    }
+
+    private void ApplyKnockback(Vector2 sourcePosition)
+    {
+        if (!isKnockedBack)
+        {
+            StartCoroutine(KnockbackCoroutine((transform.position - (Vector3)sourcePosition).normalized));
+        }
+    }
+
+    IEnumerator KnockbackCoroutine(Vector2 knockbackDir)
+    {
+        isKnockedBack = true;
+        anim.SetTrigger("hit");
+        anim.SetBool("isHit", true);
+        rb.linearVelocity = Vector2.zero; // Clear existing velocity
+        rb.AddForce(knockbackDir * knockbackForce, ForceMode2D.Impulse);
+
+        yield return new WaitForSeconds(knockbackDuration);
+
+        isKnockedBack = false;
+        anim.SetBool("isHit", false);
     }
 
     public void Heal(int amount)
@@ -159,6 +215,17 @@ public class PlayerController : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Enemy"))
         {
+            ApplyKnockback(collision.transform.position);
+            int damage = collision.gameObject.GetComponent<DamagePlayer>().GetDamageAmount();
+            TakeDamage(damage);
+        }
+    }
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Enemy"))
+        {
+            ApplyKnockback(collision.transform.position);
             int damage = collision.gameObject.GetComponent<DamagePlayer>().GetDamageAmount();
             TakeDamage(damage);
         }
