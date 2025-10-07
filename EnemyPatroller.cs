@@ -1,27 +1,43 @@
 using UnityEngine;
 using System.Collections;
+using Unity.Hierarchy;
 
 public class EnemyPatroller : MonoBehaviour
 {
-    [SerializeField] float moveSpeed = 2f;
-    [SerializeField] Transform groundCheck;
-    [SerializeField] LayerMask groundLayer;
-    [SerializeField] float groundCheckDistance = 0.1f;
-    [SerializeField] Transform wallCheck;
-    [SerializeField] float wallCheckDistance = 0.5f;
-    [SerializeField] float pauseTime = 0.5f;
+    [SerializeField] private float moveSpeed = 2f;
+    [SerializeField] private Transform groundCheck;
+    [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private float groundCheckDistance = 0.1f;
+    [SerializeField] private Transform wallCheck;
+    [SerializeField] private float wallCheckDistance = 0.5f;
+    [SerializeField] private float pauseTime = 0.5f;
+    [SerializeField] private float hitDuration = 0.2f;
+
+    public int maxHealth = 3;
 
     private Rigidbody2D rb;
     private bool isMovingRight = true;
     private bool isTurning = false;
+    private Animator anim;
+    private float hitTimer = 0f;
+    private int currentHealth;
 
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        anim = GetComponent<Animator>();
+        currentHealth = maxHealth;
     }
 
     private void FixedUpdate()
     {
+        if (hitTimer > 0)
+        {
+            rb.linearVelocity = Vector2.zero;
+            hitTimer -= Time.fixedDeltaTime;
+            return;
+        }
+
         if (isTurning) return;
 
         rb.linearVelocity = new Vector2((isMovingRight ? 1 : -1) * moveSpeed, rb.linearVelocity.y);
@@ -32,6 +48,26 @@ public class EnemyPatroller : MonoBehaviour
         {
             StartCoroutine(FlipAfterPause());
         }
+    }
+
+    private void Update()
+    {
+        anim.SetFloat("moveX", Mathf.Abs(rb.linearVelocity.x));
+    }
+
+    public void TakeDamage(int damageAmount)
+    {
+        if (currentHealth <= 0)
+        {
+            Destroy(gameObject);
+        }
+
+        if (hitTimer > 0) return;
+
+        hitTimer = hitDuration;
+        currentHealth -= damageAmount;
+        rb.linearVelocity = Vector2.zero;
+        anim.SetTrigger("hit");
     }
 
     private IEnumerator FlipAfterPause()

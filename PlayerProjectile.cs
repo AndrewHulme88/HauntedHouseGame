@@ -1,3 +1,4 @@
+using Unity.Jobs;
 using UnityEngine;
 
 public class PlayerProjectile : MonoBehaviour
@@ -31,19 +32,14 @@ public class PlayerProjectile : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        //if (collision.CompareTag("Enemy"))
-        //{
-        //    EnemyHealth enemy = collision.GetComponent<EnemyHealth>();
-        //    if (enemy != null)
-        //    {
-        //        enemy.TakeDamage(damage);
-        //    }
-        //    Destroy(gameObject);
-        //}
-        //else if (collision.CompareTag("Obstacle"))
-        //{
-        //    Destroy(gameObject);
-        //}
+        if(collision.CompareTag("Enemy"))
+        {
+            EnemyPatroller enemy = collision.GetComponent<EnemyPatroller>();
+            if (enemy != null)
+            {
+                enemy.TakeDamage(damage);
+            }
+        }
 
         Destroy(gameObject);
     }
